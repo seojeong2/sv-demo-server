@@ -1,11 +1,13 @@
 package com.example.demo.controller;
 
 import com.example.demo.audio.AudioRecorder;
+import com.example.demo.audio.FileSend;
 import com.example.demo.dto.RequestData;
 import com.example.demo.dto.ResponseMessage;
 import com.example.demo.service.TcpClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.coyote.Request;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,30 +24,83 @@ public class SpeakController {
     private static AudioRecorder audioRecorder;
     private static TcpClient tcpClient;
 
+    private static FileSend fileSend;
+
     //@CrossOrigin(origins = "https://172.20.10.4")
     @CrossOrigin(origins = "http://localhost:3000")
     @PostMapping("/record/registration")
     @ResponseBody
-    public String recordAudio(@RequestBody RequestData requestData) {
+    public String voiceReg(@RequestBody RequestData requestData) {
 
         log.info("calling recordAudio");
         log.info("requestData: " + requestData.getUserId());
 
 
         Mixer.Info desiredMixerInfo = audioRecorder.findDesiredMicrophone();
+        log.info("사용할 마이크 믹서: " + desiredMixerInfo.getName());
 
         if(desiredMixerInfo != null) {
-            audioRecorder.startRecording(desiredMixerInfo, audioRecorder.recordDuration, requestData.getUserId());
+            audioRecorder.startRecording(desiredMixerInfo, audioRecorder.recordDuration, requestData.getUserId(), "registration"); // 음성 녹음 및 저장
             log.info("file record success");
 
-            String response = tcpClient.sendReqToServer();
 
+            // scp 되는지 확인 필요!
+            String localFilePath = "/Users/seojeong/Downloads/demo/wav/" + requestData.getUserId() + "_reg_audio.wav";
+            String fileSendResponse = fileSend.audioFileSend(localFilePath);
+            log.info("fileSendResponse: " + fileSendResponse);
+
+
+            if (fileSendResponse == "success") {
+                String response = tcpClient.sendReqToServer("registration", requestData.getUserId()); // 화자인증 서버로 등록 요청 전송
+                return response;
+            } else {
+                return "파일 전송 실패";
+            }
+
+            //String response = tcpClient.sendReqToServer("registration", requestData.getUserId()); // 화자인증 서버로 등록 요청 전송
 
             //return new ResponseEntity<>(new ResponseMessage("success", "요청 성공"), HttpStatus.OK);
-            return response;
+            //return response;
         } else {
             log.info("error");
             //return new ResponseEntity<>(new ResponseMessage("error","요청 에러"), HttpStatus.BAD_REQUEST);
+            return "error";
+        }
+
+    }
+
+    @PostMapping("/record/authentication")
+    @CrossOrigin(origins = "http://localhost:3000")
+    @ResponseBody
+    public String voiceAuth(@RequestBody RequestData requestData) {
+
+        log.info("calling voiceAuth");
+        log.info("requestData: " + requestData.getUserId());
+
+        Mixer.Info desiredMixerInfo = audioRecorder.findDesiredMicrophone();
+
+        // 마이크 입력부 찾기
+        if (desiredMixerInfo != null) {
+            audioRecorder.startRecording(desiredMixerInfo, audioRecorder.authDuration, requestData.getUserId(),"authentication"); // 음성 녹음 미 저장
+            log.info("auth file record success");
+
+
+            // scp 되는지 확인 필요!
+            String localFilePath = "/Users/seojeong/Downloads/demo/wav/" + requestData.getUserId() + "_auth_audio.wav";
+            String fileSendResponse = fileSend.audioFileSend(localFilePath);
+            log.info("fileSendResponse: " + fileSendResponse);
+
+            if (fileSendResponse == "success") {
+                String response = tcpClient.sendReqToServer("authentication", requestData.getUserId());
+                return response;
+            } else {
+                return "파일 전송 실패";
+            }
+
+
+
+        } else {
+            log.info("error");
             return "error";
         }
 

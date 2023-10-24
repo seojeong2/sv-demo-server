@@ -8,13 +8,20 @@ import javax.sound.sampled.*;
 import java.io.File;
 import java.io.IOException;
 
+import java.util.Timer;
+import java.util.TimerTask;
+
 
 @Slf4j
 @Service
 public class AudioRecorder {
 
 
-    public static final int recordDuration = 10;
+    public static final int recordDuration = 20;
+
+    public static final int authDuration = 10;
+
+    private static TargetDataLine line;
 
     // 마이크 정보 찾기
     public static Mixer.Info findDesiredMicrophone() {
@@ -33,49 +40,91 @@ public class AudioRecorder {
         return null;
     }
 
-    public static void startRecording(Mixer.Info mixerInfo, int maxDuration, String userId) {
+    public static void startRecording(Mixer.Info mixerInfo, int maxDuration, String userId, String reqType) {
+
+        String audioFileType = reqType == "registration" ? "reg" : "auth";
+
+
         try{
             Mixer mixer = AudioSystem.getMixer(mixerInfo);
-            TargetDataLine line = (TargetDataLine) mixer.getLine(new TargetDataLine.Info(TargetDataLine.class,null));
+            line = (TargetDataLine) mixer.getLine(new TargetDataLine.Info(TargetDataLine.class,null));
 
-            AudioFormat format = new AudioFormat(44100,16,2,true,false);
-            line.open(format);
-            line.start();
+            AudioFormat format = new AudioFormat(44100,16,1,true,false);
+            line.open(format); // 마이크 라인 열기
+            log.info("녹음을 시작합니다. " + maxDuration +" 초 동안 녹음됩니다.");
+            line.start(); // 마이크 시작
 
 
-            File audioFile = new File("/Users/seojeong/Downloads/demo/wav/" + userId + "_recorded_audio.wav");
+            //String localPath = "/Users/seojeong/Downloads/demo/wav/" + userId + "_reg_audio.wav"; // 녹음 음성 저장 경로
+            String localPath = "/Users/seojeong/Downloads/demo/wav/" + userId + "_" + audioFileType +"_audio.wav";
 
-            long startTime = System.currentTimeMillis();
+            // 마이크 입력 시작
+            Timer timer = new Timer();
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    // 녹음 중지
 
-            while(System.currentTimeMillis() - startTime < maxDuration * 1000) {
+                    stopRecording();
+                    timer.cancel();
+                }
+            }, maxDuration * 1000);
 
-            }
+            //Thread.sleep(maxDuration * 1000);
+            // 녹음 데이터 파일에 저장
+            AudioInputStream audioInputStream = new AudioInputStream(line);
+            File audioFile = new File(localPath);
+            AudioSystem.write(audioInputStream,AudioFileFormat.Type.WAVE, audioFile);
 
-            // 마이크 중지 및 녹음 파일 저장
-            stopRecordingAndSave(line, audioFile);
-        } catch ( LineUnavailableException e) {
+
+//            File audioFile = new File(localPath);
+//
+//            long startTime = System.currentTimeMillis();
+//
+//            while(System.currentTimeMillis() - startTime < maxDuration * 1000) {
+//
+//            }
+//            // 마이크 중지 및 녹음 파일 저장
+//            stopRecordingAndSave(line, audioFile);
+        } catch ( LineUnavailableException  | IOException e) {
             e.printStackTrace();
         }
     }
 
+    /*
     public static void stopRecordingAndSave(TargetDataLine line, File audioFile) {
         try{
-            line.stop();
-            line.close();
 
             AudioInputStream audioInputStream = new AudioInputStream(line);
+            AudioFormat format = new AudioFormat(44100,16,1,true,false);
 
 
             // 파일에 저장
-            AudioSystem.write(audioInputStream, AudioFileFormat.Type.WAVE, audioFile);
+           // AudioSystem.write(audioInputStream, AudioFileFormat.Type.WAVE, audioFile);
+
+            AudioSystem.write(
+                    new AudioInputStream(audioInputStream, format, audioInputStream.getFrameLength()),
+                    AudioFileFormat.Type.WAVE,
+                    audioFile
+            );
 
             log.info("음성 데이터를 파일로 저장했습니다.");
+            line.stop();
+            line.close();
 
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
+     */
+
+    public static void stopRecording() {
+        line.stop();
+        line.close();
+    }
+
 
 
 //    public static void audioRecord() {
