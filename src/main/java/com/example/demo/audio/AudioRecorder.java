@@ -21,35 +21,85 @@ public class AudioRecorder {
 
     public static final int authDuration = 10;
 
+    public static final int classificationDuration = 2;
+
     private static TargetDataLine line;
 
     // 마이크 정보 찾기
+//    public static Mixer.Info findDesiredMicrophone() {
+//        Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
+//
+//        for(Mixer.Info info: mixerInfos) {
+//            Mixer mixer = AudioSystem.getMixer(info);
+//
+//            if(mixer.isLineSupported(new TargetDataLine.Info(TargetDataLine.class,null))) {
+//                System.out.println("마이크 정보: " + info.getName());
+//                System.out.println("마이크 설명: " + info.getDescription());
+//
+//                return info;
+//            }
+//        }
+//        return null;
+//    }
+    // 사용가능한 마이크 찾기
     public static Mixer.Info findDesiredMicrophone() {
         Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
 
         for(Mixer.Info info: mixerInfos) {
             Mixer mixer = AudioSystem.getMixer(info);
 
-            if(mixer.isLineSupported(new TargetDataLine.Info(TargetDataLine.class,null))) {
-                System.out.println("마이크 정보: " + info.getName());
-                System.out.println("마이크 설명: " + info.getDescription());
+//            if(mixer.isLineSupported(new TargetDataLine.Info(TargetDataLine.class,null))) {
+//                System.out.println("마이크 정보: " + info.getName());
+//                System.out.println("마이크 설명: " + info.getDescription());
+//
+//                return info;
+//            }
+            Line.Info targetLineInfo = new Line.Info(TargetDataLine.class);
+            if (mixer.isLineSupported(targetLineInfo)) {
+                // usb 마이크 이름으로 찾기
+                if (info.getName().contains("Usb Audio Device")) {
+                    System.out.println("USB 마이크 정보: " + info.getName());
+                    System.out.println("USB 마이크 설명: " + info.getDescription());
+                    return info;
+                }
 
+            }
+        }
+
+        // usb mic가 없을때는 내장 마이크로
+        for (Mixer.Info info:mixerInfos) {
+            Mixer mixer = AudioSystem.getMixer(info);
+
+            Line.Info targetLineInfo = new Line.Info(TargetDataLine.class);
+            if (mixer.isLineSupported(targetLineInfo)) {
+                System.out.println("내장 마이크 정보: " + info.getName());
+                System.out.println("내장 마이크 설명: " + info.getDescription());
                 return info;
             }
         }
+
         return null;
     }
 
+
     public static void startRecording(Mixer.Info mixerInfo, int maxDuration, String userId, String reqType) {
 
-        String audioFileType = reqType == "registration" ? "reg" : "auth";
+        String audioFileType = "";
+        if (reqType == "registration") {
+            audioFileType = "reg";
+        } else if (reqType == "authentication") {
+            audioFileType = "auth";
+        } else {
+            audioFileType = "classifi";
+        }
+        //String audioFileType = reqType == "registration" ? "reg" : "auth";
 
 
         try{
             Mixer mixer = AudioSystem.getMixer(mixerInfo);
             line = (TargetDataLine) mixer.getLine(new TargetDataLine.Info(TargetDataLine.class,null));
 
-            AudioFormat format = new AudioFormat(44100,16,1,true,false);
+            AudioFormat format = new AudioFormat(16000,16,1,true,false);
             line.open(format); // 마이크 라인 열기
             log.info("녹음을 시작합니다. " + maxDuration +" 초 동안 녹음됩니다.");
             line.start(); // 마이크 시작

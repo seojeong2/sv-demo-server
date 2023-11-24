@@ -36,7 +36,9 @@ public class SpeakController {
         log.info("requestData: " + requestData.getUserId());
 
 
-        Mixer.Info desiredMixerInfo = audioRecorder.findDesiredMicrophone();
+        Mixer.Info desiredMixerInfo = audioRecorder.findDesiredMicrophone(); // 마이크 정보 찾음
+
+
         log.info("사용할 마이크 믹서: " + desiredMixerInfo.getName());
 
         if(desiredMixerInfo != null) {
@@ -46,7 +48,7 @@ public class SpeakController {
 
             // scp 되는지 확인 필요!
             String localFilePath = "/Users/seojeong/Downloads/demo/wav/" + requestData.getUserId() + "_reg_audio.wav";
-            String fileSendResponse = fileSend.audioFileSend(localFilePath);
+            String fileSendResponse = fileSend.audioFileSend(localFilePath,"registration");
             log.info("fileSendResponse: " + fileSendResponse);
 
 
@@ -87,7 +89,7 @@ public class SpeakController {
 
             // scp 되는지 확인 필요!
             String localFilePath = "/Users/seojeong/Downloads/demo/wav/" + requestData.getUserId() + "_auth_audio.wav";
-            String fileSendResponse = fileSend.audioFileSend(localFilePath);
+            String fileSendResponse = fileSend.audioFileSend(localFilePath,"authentication");
             log.info("fileSendResponse: " + fileSendResponse);
 
             if (fileSendResponse == "success") {
@@ -105,4 +107,39 @@ public class SpeakController {
         }
 
     }
+
+    @PostMapping("/record/classification")
+    @CrossOrigin(origins = "http://localhost:3000")
+    @ResponseBody
+    public String voiceClassification(@RequestBody RequestData requestData) {
+        log.info("calling voiceClassification");
+        log.info("requestData: " + requestData.getUserId());
+
+        Mixer.Info desiredMixerInfo = audioRecorder.findDesiredMicrophone();
+
+        // 마이크 입력부 찾기
+        if (desiredMixerInfo != null) {
+            audioRecorder.startRecording(desiredMixerInfo, audioRecorder.classificationDuration, requestData.getUserId(),"classification"); // 음성 녹음 미 저장
+            log.info("classify file record success");
+
+            // scp 되는지 확인 필요!
+            String localFilePath = "/Users/seojeong/Downloads/demo/wav/" + requestData.getUserId() + "_classifi_audio.wav";
+            String fileSendResponse = fileSend.audioFileSend(localFilePath,"classifi");
+            log.info("fileSendResponse: " + fileSendResponse);
+
+            if (fileSendResponse == "success") {
+                String response = tcpClient.sendClassificationReq(requestData.getUserId(),"classifi");
+                return response;
+            } else {
+                return "파일 전송 실패";
+            }
+
+
+
+        } else {
+            log.info("error");
+            return "error";
+        }
+    }
+
 }
